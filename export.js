@@ -27,7 +27,7 @@
 
   function sheet(wb, name, fin) {
     const qs = JSON.parse(fin.j || '[]'); const u = unitOf(fin.cur);
-    const ws = wb.addWorksheet(name, {views: [{showGridLines: false, state: 'frozen', xSplit: 3, ySplit: 3}]});
+    const ws = wb.addWorksheet(name + '_Q', {views: [{showGridLines: false, state: 'frozen', xSplit: 3, ySplit: 3}]});
     ws.getColumn(1).width = 2.625; ws.getColumn(2).width = 2.625; ws.getColumn(3).width = 49.25;
     const C0 = 4, last = C0 + qs.length - 1;
     for (let c = C0; c <= last; c++) ws.getColumn(c).width = 11;
@@ -90,6 +90,69 @@
     note('출처: stockanalysis 분기 재무(S&P Global). 파란 글씨 = 원자료 입력값, 검정 = 수식.');
     if (qs.some((q) => q.prov)) note('(P) = 잠정: stockanalysis 미반영 최신 분기를 DART 잠정실적 또는 회사 보도자료로 채운 값(매출·영업이익·순이익만).');
     note('Capex·자사주 매입·배당은 현금 유출이라 음수로 표시.');
+    return {qs, u, rowOf, present, C0, last};
+  }
+
+  // 연간: 분기 시트를 회계연도별로 SUM (4개 분기가 모두 있는 연도만, 항목별로 4분기 값이 다 있을 때만)
+  function annual(wb, name, info) {
+    const {qs, u, rowOf, present, C0} = info;
+    const years = [];
+    qs.forEach((q, i) => {
+      const m = /Q(\d)\s+(\d{4})/.exec(q.fq || ''); if (!m) return;
+      let y = years.find((x) => x.y === m[2]); if (!y) years.push(y = {y: m[2], idx: {}});
+      y.idx[m[1]] = i; if (q.prov) y.prov = true;
+    });
+    const fy = years.filter((y) => ['1', '2', '3', '4'].every((k) => y.idx[k] != null) && y.idx['4'] - y.idx['1'] === 3);
+    if (!fy.length) return false;
+    const QN = name + '_Q';
+    const ws = wb.addWorksheet(name + '_A', {views: [{showGridLines: false, state: 'frozen', xSplit: 3, ySplit: 3}]});
+    ws.getColumn(1).width = 2.625; ws.getColumn(2).width = 2.625; ws.getColumn(3).width = 49.25;
+    const last = C0 + fy.length - 1;
+    for (let c = C0; c <= last; c++) ws.getColumn(c).width = 11;
+    for (let c = 3; c <= last; c++) { const x = ws.getCell(2, c); x.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FF595959'}}; x.font = {name: TTL, size: 11, color: {argb: 'FFFFFFFF'}}; }
+    ws.getCell(2, 3).value = `${name} Income Statement_Annually`;
+    const h = ws.getCell(3, 3); h.value = u.label; h.font = {name: HDR, size: 11}; h.border = {bottom: {style: 'double'}};
+    fy.forEach((y, i) => { const x = ws.getCell(3, C0 + i); x.value = `FY${y.y.slice(2)}` + (y.prov ? '(P)' : ''); x.font = {name: HDR, size: 11}; x.alignment = {horizontal: 'right'}; x.border = {bottom: {style: 'double'}}; });
+    ws.getRow(3).height = 16.5;
+    const aRow = {}, aPresent = {}; let r = 4;
+    for (const [label, kind, arg] of ROWS) {
+      if (kind === 'qoq') continue;
+      if (kind === 'sec') { if (!rowOf[label]) continue; for (let c = 3; c <= last; c++) { const x = ws.getCell(r, c); x.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFF2F2F2'}}; x.border = {top: {style: 'thin'}}; } ws.getCell(r, 3).value = label; ws.getCell(r, 3).font = {name: LBL, size: 11, color: {argb: BLACK}}; aRow[label] = r++; continue; }
+      const base = kind === 'yoy' ? arg : kind === 'pct' ? null : label;
+      if (kind === 'yoy' && !aRow[arg]) continue;
+      if (kind === 'pct' && !(aRow[arg[0]] && aRow[arg[1]])) continue;
+      if (kind === 'etr' && !(aRow['Income before income taxes'] && aRow['Provision for income taxes'])) continue;
+      if (!['yoy', 'pct', 'etr'].includes(kind) && !rowOf[label]) continue;
+      const isPct = kind === 'yoy' || kind === 'pct' || kind === 'etr';
+      const lc = ws.getCell(r, 3); lc.value = kind === 'yoy' ? '  YoY(%)' : label;
+      lc.font = isPct ? {name: NUMF, size: 11, bold: kind === 'yoy', italic: true} : {name: LBL, size: 11, color: {argb: BLACK}};
+      if (kind === 'yoy') lc.alignment = {horizontal: 'right'};
+      const top = kind === 'sub' || kind === 'gp' || kind === 'fcf';
+      if (top) lc.border = {top: {style: 'thin'}};
+      fy.forEach((y, i) => {
+        const c = C0 + i, x = ws.getCell(r, c); let v = null;
+        const a = (lab, j = i) => aPresent[lab] && aPresent[lab][j];
+        const ref = (lab, cc = c) => `${col(cc)}${aRow[lab]}`;
+        if (kind === 'yoy') { if (i > 0 && a(arg) && a(arg, i - 1)) v = {formula: `IFERROR(${ref(arg)}/${ref(arg, c - 1)}-1,"n/a")`}; }
+        else if (kind === 'pct') { if (a(arg[0]) && a(arg[1])) v = {formula: `IFERROR(${ref(arg[0])}/${ref(arg[1])},"n/a")`}; }
+        else if (kind === 'etr') { if (a('Income before income taxes') && a('Provision for income taxes')) v = {formula: `IFERROR(IF(${ref('Income before income taxes')}=0,0,${ref('Provision for income taxes')}/${ref('Income before income taxes')}),"n/a")`}; }
+        else {
+          const qi = ['1', '2', '3', '4'].map((k) => y.idx[k]);
+          if (qi.every((j) => present[label] && present[label][j])) v = {formula: `SUM('${QN}'!${col(C0 + qi[0])}${rowOf[label]}:${col(C0 + qi[3])}${rowOf[label]})`};
+        }
+        (aPresent[kind === 'yoy' ? '_' : label] = aPresent[kind === 'yoy' ? '_' : label] || [])[i] = v != null;
+        x.value = v; x.numFmt = isPct ? FMT_P : kind === 'eps' ? FMT_EPS : u.fmt;
+        x.font = {name: NUMF, size: 11, color: {argb: BLACK}, bold: kind === 'yoy', italic: isPct};
+        if (kind === 'yoy') x.alignment = {horizontal: 'right'};
+        if (top) x.border = {top: {style: 'thin'}};
+      });
+      if (kind !== 'yoy') aRow[label] = r; r++;
+    }
+    r++;
+    const note = (t) => { const x = ws.getCell(r++, 3); x.value = t; x.font = {name: LBL, size: 9, color: {argb: 'FF7F7F7F'}}; };
+    note(`연간 = '${QN}' 시트 4개 분기 합계(회계연도 기준). 분기가 모두 있는 연도만 표시하고, 4개 분기 값이 다 없는 항목은 비움.`);
+    note('Diluted EPS 연간값은 분기 EPS 합계라 회사 공시 연간 EPS와 조금 다를 수 있음.');
+    return true;
   }
 
   let lib;
@@ -109,9 +172,9 @@
       const used = new Set(); let n = 0;
       for (const id of ids) {
         const x = byId.get(id); if (!x || !x.j) continue;
-        let nm = (id.split('_').slice(2).join('_') || id).replace(/[\\/?*\[\]:]/g, '').slice(0, 28) || 'Sheet';
+        let nm = (id.split('_').slice(2).join('_') || id).replace(/[\\/?*\[\]:]/g, '').slice(0, 26) || 'Sheet';
         let k = nm, i = 2; while (used.has(k.toLowerCase())) k = `${nm}_${i++}`; used.add(k.toLowerCase());
-        sheet(wb, k, x); n++;
+        annual(wb, k, sheet(wb, k, x)); n++;
       }
       if (!n) { alert('이 조건에 분기 재무가 있는 기업이 없어요.'); return; }
       const buf = await wb.xlsx.writeBuffer();

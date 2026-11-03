@@ -1,6 +1,6 @@
 /* Standalone runtime for the earnings dashboard page (replaces the Claude Dashboard runtime). */
 (function () {
-  const FILES = {earnings: 'data/earnings.json', prices: 'data/prices.json', fin: 'data/fin.json', bench: 'data/bench.json'};
+  const FILES = {earnings: 'data/earnings.json', prices: 'data/prices.json', fin: 'data/fin.json', bench: 'data/bench.json', info: 'data/info.json'};
   const store = {};
   const draws = {};
   const onData = [];

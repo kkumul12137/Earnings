@@ -2,6 +2,6 @@
 
 미장·국장·일장 실적발표 기업별 컨센 대비 실적, 주가 반응, 분기 재무, 반응 이유(사실/추론)를 모은 대시보드입니다.
 
-- 공개 주소: https://kkumul12137.github.io/earnings/
+- 공개 주소: https://kkumul12137.github.io/Earnings/
 - `index.html` + `data/*.json` 은 Claude 대시보드에서 자동 생성됩니다. 직접 수정하지 마세요.
 - 투자 권유가 아닌 스크리닝용 자료입니다.

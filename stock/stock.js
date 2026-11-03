@@ -87,6 +87,11 @@
 .stk-desc{margin:0;line-height:1.6;font-size:14px}
 .stk-err{color:var(--color-warn);font-size:13px}
 .stk-call{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.stk-sum{display:block!important;padding:4px 0 14px!important}
+.stk-sumin section{margin:10px 0 0}
+.stk-sumin h4{margin:0 0 4px;font-size:14px}
+.stk-sumin h4 em{font-style:normal;font-weight:400;font-size:12px;color:var(--color-fg-muted);margin-left:6px}
+.stk-sumin p{margin:0;line-height:1.6;white-space:pre-line;overflow-wrap:anywhere}
 .stk-dlink{margin-left:auto;font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--color-border-line);border-radius:6px;background:none;color:inherit;cursor:pointer}
 @media (max-width:600px){.stk-h h2{font-size:20px}.stk-px{font-size:22px}.stk-chart{height:220px}}
 `;
@@ -213,7 +218,7 @@
       ${card('profile', '기업 정보', r.m === 'U' ? 'SEC EDGAR' : r.m === 'K' ? 'DART' : 'EDINET 코드리스트')}
       ${card('fin', '분기 실적', rawFin)}
       ${card('docs', '실적 공시 · IR 자료', r.m === 'U' ? 'SEC 8-K (Item 2.02)' : r.m === 'K' ? 'DART 공시 목록' : 'TDnet · EDINET')}
-      ${card('calls', '분기별 실적·컨콜 정리', '대시보드 정리본 · 누르면 BM·실적·컨콜·Q&A·반응 이유')}
+      ${card('calls', '분기별 실적·컨콜 정리', '대시보드 정리본 · 누르면 펼쳐짐')}
       <p class="stk-mut" style="margin-top:14px">어닝콜 스크립트는 아직 넣지 않았어요(유료 데이터). <a href="${sl.web}" target="_blank" rel="noopener">stockanalysis에서 보기 ↗</a></p>`;
     const tasks = [quote(r, sl), chart(r, sl), stats(r, sl), profile(r), fin(r, sl), docs(r), calls(r)];
     tasks.forEach((p) => p.catch(() => {}));
@@ -396,16 +401,33 @@
         return `<li><button type="button" class="stk-call" data-i="${i}"><b>${esc(x.date)}</b> ${esc(x.timing || '')} 발표</button>`
           + (rx != null ? `<span class="${rx > 0 ? 'stk-up' : rx < 0 ? 'stk-dn' : ''}">반응 ${pct(rx)}</span>` : '')
           + (es != null ? `<span class="stk-mut">EPS 서프 ${pct(es)}</span>` : '') + (rs != null ? `<span class="stk-mut">매출 서프 ${pct(rs)}</span>` : '')
-          + (x.score != null ? `<span class="stk-tag">점수 ${esc(x.score)}</span>` : '') + '</li>';
+          + '</li>';
       }).join('')}</ul>`);
-      el.querySelectorAll('.stk-call').forEach((b) => b.addEventListener('click', () => {
-        const x = rows[+b.dataset.i]; close();
-        if (window.dash && dash.setParams) {
-          dash.setParams({date: x.date, sel: x.id, mkt: null, sector: null, timing: null, cap: null, dir: null, q: null});
-          setTimeout(() => { const d = document.getElementById('detail'); if (d) d.scrollIntoView({behavior: 'smooth', block: 'start'}); if (dash.setLink) dash.setLink('detail'); }, 150);
-        }
+      el.querySelectorAll('.stk-call').forEach((b) => b.addEventListener('click', () => { // 이 화면 안에서 펼치기
+        const li = b.closest('li'); const box = li.nextElementSibling && li.nextElementSibling.classList.contains('stk-sum') ? li.nextElementSibling : null;
+        if (box) { box.remove(); b.setAttribute('aria-expanded', 'false'); return; }
+        li.insertAdjacentHTML('afterend', `<li class="stk-sum">${summary(rows[+b.dataset.i])}</li>`); b.setAttribute('aria-expanded', 'true');
       }));
+      const first = el.querySelector('.stk-call'); if (first) first.click();
     } catch (e) { fill('calls', '<span class="stk-err">정리본을 불러오지 못했어요</span>'); }
+  }
+
+  function summary(x) {
+    const sec = (t, v, tag) => v && String(v).trim() ? `<section><h4>${t}${tag ? `<em>${tag}</em>` : ''}</h4><p>${esc(v)}</p></section>` : '';
+    let tbl = '';
+    try {
+      const T = typeof x.resTbl === 'string' ? JSON.parse(x.resTbl) : x.resTbl;
+      if (T && T.rows && T.rows.length) {
+        const mv = (v, u, t) => v == null ? '—' : t === 'eps' || Math.abs(v) < 1e5 ? nf(v, 2) : money(v, u);
+        tbl = `<div class="stk-tw"><table class="stk-t"><thead><tr><th>항목</th><th>실제</th><th>컨센</th><th>차이</th><th>YoY</th><th>QoQ</th></tr></thead><tbody>${T.rows.map((q) => `<tr><td>${esc(q.k)}</td><td>${mv(q.a, q.u, q.t)}</td><td>${mv(q.e, q.u, q.t)}</td><td class="${q.s > 0 ? 'stk-up' : q.s < 0 ? 'stk-dn' : ''}">${pct(q.s)}</td><td>${pct(q.yoy)}</td><td>${pct(q.qoq)}</td></tr>`).join('')}</tbody></table></div>`;
+      }
+    } catch (e) { /* 표 없음 */ }
+    const src = String(x.sources || '').split('||').map((t) => t.split('|').map((y) => y.trim())).filter((t) => t[1] && /^https?:/.test(t[1]));
+    return `<div class="stk-sumin">
+      <section><h4>실적<em>컨센 대비 · 사실</em></h4>${tbl}<p>${esc(x.resNote || x.results || '')}</p></section>
+      ${sec('BM', x.bm)}${sec('컨콜·경영진 코멘트', x.call)}${sec('Q&A', x.qa)}${sec('주가 퍼포먼스', x.perf, 'stockanalysis 차트 기준')}
+      ${sec('반응 이유', x.whyFact, '사실')}${sec('반응 이유', x.whyInfer, '추론')}
+      ${src.length ? `<p class="stk-mut">출처: ${src.map((t) => `<a href="${esc(t[1])}" target="_blank" rel="noopener">${esc(t[0])}</a>`).join(' · ')}</p>` : ''}</div>`;
   }
 
   // ---------- 분기 실적 ----------

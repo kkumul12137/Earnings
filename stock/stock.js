@@ -491,8 +491,40 @@
         const p = near(F.S[k], d); const yoy = p != null && p !== 0 && (p > 0 || t !== 'eps') ? (v / p - 1) * 100 * (p < 0 ? -1 : 1) : null;
         return `<td>${t === 'eps' ? nf(v, 2) : money(v, F.cur)}${yoy != null ? `<small class="${yoy > 0 ? 'stk-up' : 'stk-dn'}">YoY ${pct(yoy, 0)}</small>` : ''}</td>`;
       }).join('')}</tr>`).join('');
-      fill('fin', `<div class="stk-tw"><table class="stk-t"><thead>${head}</thead><tbody>${body}</tbody></table></div><p class="stk-mut" style="margin:8px 0 0">${esc(F.note)}</p>`);
+      lastFin = {r, F, ends: keyEnds};
+      fill('fin', `<button type="button" class="stk-dlink stk-xl" style="float:right;margin:-34px 0 0">⬇ 엑셀</button><div class="stk-tw"><table class="stk-t"><thead>${head}</thead><tbody>${body}</tbody></table></div><p class="stk-mut" style="margin:8px 0 0">${esc(F.note)}</p>`);
+      const xb = ov && $('#stk-fin .stk-xl', ov); if (xb) xb.onclick = () => finXlsx(xb);
     } catch (e) { fail('fin', e); }
+  }
+  let lastFin = null, xlLib = null;
+  const loadXl = () => xlLib || (xlLib = new Promise((ok, no) => { if (window.ExcelJS) return ok(); const sc = document.createElement('script'); sc.src = 'exceljs.min.js'; sc.onload = ok; sc.onerror = () => { xlLib = null; no(new Error('엑셀 라이브러리 로드 실패')); }; document.head.appendChild(sc); }));
+  async function saveFile(name, buf) {
+    const type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) { try { await dl.save({filename: name, data: new Blob([buf], {type})}); } catch (e) { if (e && e.code !== 'declined') alert('다운로드 실패: ' + (e.message || e.code)); } return; }
+    const url = URL.createObjectURL(new Blob([buf], {type})); const a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  async function finXlsx(btn) { // 상세 화면에 보이는 회사 한 곳의 분기 실적만
+    if (!lastFin) return; const {r, F} = lastFin; const t = btn.textContent; btn.disabled = true; btn.textContent = '만드는 중…';
+    try {
+      await loadXl();
+      const ends = [...new Set(Object.values(F.S).flatMap((o) => Object.keys(o)))].sort().reverse().filter((d) => (F.S.rev && F.S.rev[d] != null) || (F.S.ni && F.S.ni[d] != null)).slice(0, 12).reverse();
+      const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet(r.sym.slice(0, 31));
+      const unit = F.cur === 'USD' ? 1e6 : F.cur === 'KRW' ? 1e8 : F.cur === 'JPY' ? 1e6 : 1e6;
+      const uname = F.cur === 'KRW' ? '억원' : F.cur === 'JPY' ? '백만엔' : `백만 ${F.cur}`;
+      ws.addRow([`${r.name} (${r.sym}) 분기 실적`]); ws.getRow(1).font = {bold: true, size: 13};
+      ws.addRow([`단위: ${uname} (EPS는 ${F.cur})`]); ws.addRow([]);
+      const hr = ws.addRow(['항목', ...ends.map((d) => d.slice(0, 7))]); hr.font = {bold: true};
+      for (const [n, k, t2] of F.rows) {
+        if (!F.S[k] || !ends.some((d) => F.S[k][d] != null)) continue;
+        ws.addRow([n, ...ends.map((d) => F.S[k][d] == null ? null : t2 === 'eps' ? F.S[k][d] : Math.round(F.S[k][d] / unit * 10) / 10)]).eachCell((c, i) => { if (i > 1) c.numFmt = t2 === 'eps' ? '#,##0.00' : '#,##0.0'; });
+      }
+      ws.addRow([]); ws.addRow(['출처: ' + F.note]);
+      ws.getColumn(1).width = 18; for (let i = 2; i <= ends.length + 1; i++) ws.getColumn(i).width = 12;
+      await saveFile(`Financials_${r.sym}_${new Date().toISOString().slice(0, 10)}.xlsx`, await wb.xlsx.writeBuffer());
+    } catch (e) { alert('엑셀 생성 실패: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = t; }
   }
   const qLabel = (d) => { const m = +d.slice(5, 7); return `${d.slice(2, 4)}.${String(m).padStart(2, '0')}`; };
 
@@ -513,6 +545,12 @@
         open(u.find((r) => r.m === mk && r.sym === m[2]) || {m: mk, sym: m[2], name: m[2], alt: '', id: null});
       });
       dh.appendChild(b);
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'stk-dlink'; x.style.marginLeft = '6px'; x.textContent = '⬇ 이 회사 엑셀';
+      x.title = '지금 상세에 열린 회사의 분기 재무만 엑셀로 받기';
+      x.addEventListener('click', () => { const xb = document.querySelector('.ed-xlsx'); if (xb && window.edSelected && window.edSelected()) xb.click(); });
+      dh.appendChild(x);
+      // 상단 버튼은 선택 여부에 따라 라벨을 바꿔 무엇을 받는지 보이게
+      setInterval(() => { const xb = document.querySelector('.ed-xlsx'); if (!xb || xb.disabled) return; const sel = window.edSelected && window.edSelected(); const lbl = sel ? `⬇ ${sel.name} 엑셀` : '⬇ 필터 전체 엑셀'; if (xb.textContent !== lbl) xb.textContent = lbl; }, 500);
     }
   }
 

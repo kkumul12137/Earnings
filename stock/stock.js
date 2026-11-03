@@ -86,6 +86,7 @@
 .stk-ir{background:color-mix(in srgb,var(--color-ok) 18%,transparent)}
 .stk-desc{margin:0;line-height:1.6;font-size:14px}
 .stk-err{color:var(--color-warn);font-size:13px}
+.stk-call{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .stk-dlink{margin-left:auto;font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--color-border-line);border-radius:6px;background:none;color:inherit;cursor:pointer}
 @media (max-width:600px){.stk-h h2{font-size:20px}.stk-px{font-size:22px}.stk-chart{height:220px}}
 `;
@@ -212,8 +213,9 @@
       ${card('profile', '기업 정보', r.m === 'U' ? 'SEC EDGAR' : r.m === 'K' ? 'DART' : 'EDINET 코드리스트')}
       ${card('fin', '분기 실적', rawFin)}
       ${card('docs', '실적 공시 · IR 자료', r.m === 'U' ? 'SEC 8-K (Item 2.02)' : r.m === 'K' ? 'DART 공시 목록' : 'TDnet · EDINET')}
+      ${card('calls', '분기별 실적·컨콜 정리', '대시보드 정리본 · 누르면 BM·실적·컨콜·Q&A·반응 이유')}
       <p class="stk-mut" style="margin-top:14px">어닝콜 스크립트는 아직 넣지 않았어요(유료 데이터). <a href="${sl.web}" target="_blank" rel="noopener">stockanalysis에서 보기 ↗</a></p>`;
-    const tasks = [quote(r, sl), chart(r, sl), stats(r, sl), profile(r), fin(r, sl), docs(r)];
+    const tasks = [quote(r, sl), chart(r, sl), stats(r, sl), profile(r), fin(r, sl), docs(r), calls(r)];
     tasks.forEach((p) => p.catch(() => {}));
   }
 
@@ -375,6 +377,35 @@
           <li><a href="https://disclosure2.edinet-fsa.go.jp/WEEK0010.aspx" target="_blank" rel="noopener">EDINET ↗</a><span class="stk-mut">有価証券報告書·半期報告書 (${esc(r.id || '')})</span></li></ul>`);
       }
     } catch (e) { fail('docs', e); }
+  }
+
+  // ---------- 분기별 컨콜 정리 (대시보드 earnings 데이터) ----------
+  async function earningsRows() {
+    const d = window.dash && dash.data && dash.data('earnings');
+    if (d && d.status === 'ok') return d.data;
+    for (let i = 0; d && d.status === 'loading' && i < 40; i++) { await new Promise((ok) => setTimeout(ok, 250)); const e = dash.data('earnings'); if (e.status === 'ok') return e.data; }
+    const j = await fetch('data/earnings.json').then((x) => x.json()); return Array.isArray(j) ? j : (j.rows || []);
+  }
+  async function calls(r) {
+    try {
+      const rows = (await earningsRows()).filter((x) => x.mkt === MK[r.m] && String(x.ticker) === r.sym).sort((a, b) => a.date < b.date ? 1 : -1);
+      if (!rows.length) return fill('calls', '<span class="stk-mut">아직 정리된 실적발표가 없어요. 대시보드에 들어간 발표(10/28부터)만 쌓여요.</span>');
+      const el = fill('calls', `<ul class="stk-list">${rows.map((x, i) => {
+        const sp = (v) => v == null || v === '' || isNaN(v) ? null : +v;
+        const rx = sp(x.reactPct), es = sp(x.epsSurpPct), rs = sp(x.revSurpPct);
+        return `<li><button type="button" class="stk-call" data-i="${i}"><b>${esc(x.date)}</b> ${esc(x.timing || '')} 발표</button>`
+          + (rx != null ? `<span class="${rx > 0 ? 'stk-up' : rx < 0 ? 'stk-dn' : ''}">반응 ${pct(rx)}</span>` : '')
+          + (es != null ? `<span class="stk-mut">EPS 서프 ${pct(es)}</span>` : '') + (rs != null ? `<span class="stk-mut">매출 서프 ${pct(rs)}</span>` : '')
+          + (x.score != null ? `<span class="stk-tag">점수 ${esc(x.score)}</span>` : '') + '</li>';
+      }).join('')}</ul>`);
+      el.querySelectorAll('.stk-call').forEach((b) => b.addEventListener('click', () => {
+        const x = rows[+b.dataset.i]; close();
+        if (window.dash && dash.setParams) {
+          dash.setParams({date: x.date, sel: x.id, mkt: null, sector: null, timing: null, cap: null, dir: null, q: null});
+          setTimeout(() => { const d = document.getElementById('detail'); if (d) d.scrollIntoView({behavior: 'smooth', block: 'start'}); if (dash.setLink) dash.setLink('detail'); }, 150);
+        }
+      }));
+    } catch (e) { fill('calls', '<span class="stk-err">정리본을 불러오지 못했어요</span>'); }
   }
 
   // ---------- 분기 실적 ----------

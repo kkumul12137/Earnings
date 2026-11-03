@@ -11,15 +11,17 @@
   // ---------- 네트워크 ----------
   const memo = new Map();
   function px(src, path, params, kind) {
-    if (!API()) return Promise.reject(new Error('no-api'));
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    const url = `${API()}/p/${src}/${path}${qs}`;
+    const snap = window.STOCK_SNAPSHOT; // 미리보기: 미리 받아둔 응답 파일
+    if (!API() && !snap) return Promise.reject(new Error('no-api'));
+    const url = snap ? snap + snapKey(src, path, qs) : `${API()}/p/${src}/${path}${qs}`;
     if (!memo.has(url)) {
       memo.set(url, fetch(url).then((r) => { if (!r.ok) throw new Error(src + ' ' + r.status); return kind === 'text' ? r.text() : r.json(); })
         .catch((e) => { memo.delete(url); throw e; }));
     }
     return memo.get(url);
   }
+  const snapKey = (src, path, qs) => (src + '/' + path + qs).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 180) + '.txt';
   let UNI = null;
   function universe() {
     if (!UNI) UNI = fetch(BASE + 'universe.json').then((r) => r.json()).then((j) => j.r.map((r) => ({m: r[0], sym: String(r[1]), name: r[2] || '', alt: r[3] || '', id: r[4], x: r[5], ind: r[6]})));

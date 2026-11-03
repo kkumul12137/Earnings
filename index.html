@@ -39,9 +39,9 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
 #dash-root { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; box-sizing: border-box; }
 #dash-root *, #dash-root *::before, #dash-root *::after { box-sizing: border-box; }
 </style>
-<script>window.DASH_VERSION = '202611030649';</script>
+<script>window.DASH_VERSION = '202611032332';</script>
 <script src="d3.min.js"></script>
-<script src="shim.js?v=202611030649"></script>
+<script src="shim.js?v=202611032332"></script>
 </head>
 <body>
 <div id="dash-root">
@@ -176,7 +176,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
 
   <div class="ed-card" id="list">
     <h2>발표 기업</h2>
-    <p class="note">열 제목을 누르면 정렬, 행을 누르면 상세가 열려. 매력도는 아래 '점수 기준'의 규칙 점수(0~100)야.</p>
+    <p class="note">열 제목을 누르면 정렬, 행을 누르면 상세가 열려.</p>
     <div class="ed-tablewrap">
       <table class="ed-table" data-source="earnings" data-row-key="id">
         <thead><tr>
@@ -190,8 +190,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
           <th data-field="epsSurpPct" class="num"><button type="button" data-sort="epsSurpPct">EPS 서프</button></th>
           <th data-field="revSurpPct" class="num opt"><button type="button" data-sort="revSurpPct">매출 서프</button></th>
           <th data-field="reactPct" class="num"><button type="button" data-sort="reactPct">반응</button></th>
-          <th data-field="excessPct" class="num opt"><button type="button" data-sort="excessPct">시장 대비</button></th>
-          <th data-field="score" class="num"><button type="button" data-sort="score">매력도</button></th>
+          <th data-field="excessPct" class="num opt"><button type="button" data-sort="excessPct" title="상장 시장 지수 대비 %p: NYSE=SPY, 나스닥=QQQ, 코스피=KODEX 200, 코스닥=KODEX 코스닥150, 일본 프라임·스탠다드·명증=TOPIX ETF, 그로스=グロース250 ETF">시장 대비</button></th>
         </tr></thead>
         <tbody data-draw="rows"></tbody>
       </table>
@@ -203,7 +202,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
       <h2 data-draw="dName">—</h2>
       <span class="ed-dmeta" data-draw="dMeta">—</span>
     </div>
-    <p class="ed-empty ed-hint">표나 차트에서 회사를 누르면 BM, 실적, 컨콜, 반응 이유, 매력도가 여기에 나와.</p>
+    <p class="ed-empty ed-hint">표나 차트에서 회사를 누르면 BM, 실적, 컨콜, 반응 이유가 여기에 나와.</p>
     <div class="ed-chart" data-draw="dChart" data-source="prices" data-fetchpriority="low" style="min-height:220px"></div>
     <section class="ed-blk" id="d-results">
       <h3>실적<em>컨센 대비 · 사실</em></h3>
@@ -236,14 +235,13 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
       <section id="d-perf"><h3>주가 퍼포먼스<em>stockanalysis 차트 기준</em></h3><p class="ed-txt" data-draw="d" data-f="perf">—</p></section>
       <section id="d-fact"><h3>반응 이유<em>사실</em></h3><p class="ed-txt" data-draw="d" data-f="whyFact">—</p></section>
       <section id="d-infer"><h3>반응 이유<em>추론</em></h3><p class="ed-txt" data-draw="d" data-f="whyInfer">—</p></section>
-      <section id="d-attract"><h3>투자 매력도<em>추론</em></h3><p class="ed-txt" data-draw="d" data-f="attract">—</p></section>
     </div>
     <p class="ed-src">출처: <span data-draw="dSrc">—</span></p>
   </div>
 
   <div class="ed-card" id="method">
     <h2>점수 기준</h2>
-    <p class="ed-method">매력도 점수는 스크리닝용 규칙 점수야(0~100, 기본 50). EPS 서프라이즈 ±15점, 매출 서프라이즈 ±10점, 주가 반응 ±15점, Fwd P/E(15배 미만 +10, 15~25배 +5, 25~40배 0, 40배 초과·적자 −5), 가이던스 상향 +5 / 하향 −5. 상세 패널의 '투자 매력도' 문단은 이 점수와 별개인 정성 판단(추론)이야. 컨센은 stockanalysis, 실적 원문은 EDGAR(미장)·DART(국장)·TDnet 決算短信(일장) 기준. 일장 EPS 서프 칸은 분기 단독 순이익 서프(컨센 있을 때만)이고, 대부분 컨센이 없어 회사 통기 계획 진척률과 예상 수정(가이던스 ±5)으로 봐. 국장 주가 반응은 다음 날 정규장 등락률이고, 장이 끝나기 전에는 비어 있어.</p>
+    <p class="ed-method">시장 대비는 종목이 상장된 시장의 지수 대비 %p야: NYSE·NYSE American=SPY, 나스닥=QQQ, 코스피=KODEX 200, 코스닥=KODEX 코스닥150, 일본 프라임·스탠다드·명증=TOPIX ETF(1306), 그로스=グロース250 ETF(2516). 컨센은 stockanalysis, 실적 원문은 EDGAR(미장)·DART(국장)·TDnet 決算短信(일장) 기준. 일장 EPS 서프 칸은 분기 단독 순이익 서프(컨센 있을 때만)이고, 대부분 컨센이 없어 회사 통기 계획 진척률과 예상 수정(가이던스 ±5)으로 봐. 국장 주가 반응은 다음 날 정규장 등락률이고, 장이 끝나기 전에는 비어 있어.</p>
   </div>
 </div>
 
@@ -351,8 +349,8 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   dash.draw('kMed', (el) => { const f = window.edRows(); if (!f) { el.textContent = '—'; return; } const m = d3.median(f.rows, (x) => num(x.reactPct)); el.textContent = m == null ? '—' : pct(m); el.className = cls(m); });
   dash.draw('kBeat', tile((r) => { const w = r.filter((x) => num(x.epsSurpPct) != null); return w.length ? d3.format('.0%')(w.filter((x) => x.epsSurpPct > 0).length / w.length) : '—'; }));
   const benchRows = () => { const b = dash.data('bench'); const f = window.edRows(); if (b.status !== 'ok' || !f) return null; const m = dash.params().mkt; return b.data.filter((r) => r.date === f.date && (!m || r.mkt === m)); };
-  dash.draw('kBench', (el) => { const b = benchRows(); if (!b || !b.length) { el.textContent = '—'; return; } el.textContent = b.map((r) => `${r.name} ${num(r.pct) == null ? '대기' : pct(r.pct)}`).slice(0, 2).join(' · '); });
-  dash.draw('kBenchNote', (el) => { const b = benchRows(); if (!b || !b.length) { el.textContent = '—'; return; } el.textContent = b.map((r) => `${r.name}: ${r.basis}`).slice(0, 2).join(' / '); });
+  dash.draw('kBench', (el) => { const b = benchRows(); if (!b || !b.length) { el.textContent = '—'; return; } el.textContent = b.map((r) => `${r.name} ${num(r.pct) == null ? '대기' : pct(r.pct)}`).join(' · '); });
+  dash.draw('kBenchNote', (el) => { const b = benchRows(); if (!b || !b.length) { el.textContent = '—'; return; } el.textContent = b.map((r) => `${r.name}: ${r.basis}`).join(' / '); });
 
   // table
   dash.draw('rows', (tb) => {
@@ -374,8 +372,6 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
       const rs = num(r.revSurpPct); td(pct(rs), 'num opt ' + (rs == null ? '' : rs > 0 ? 'up' : rs < 0 ? 'down' : ''));
       const rp = num(r.reactPct); td((rp == null ? '' : rp > 1 ? '▲ ' : rp < -1 ? '▼ ' : '– ') + pct(rp), 'num ' + cls(rp));
       const ex = num(r.excessPct); td(pct(ex), 'num opt ' + cls(ex));
-      const sc = num(r.score); const d = td(sc == null ? '' : String(Math.round(sc)), 'num');
-      if (sc != null) d.style.fontWeight = sc >= 70 ? '600' : '400';
       return tr;
     }));
   });
@@ -445,7 +441,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   dash.draw('dName', (el) => { const r = window.edSelected(); el.textContent = r ? `${r.name} (${r.ticker})` : '—'; });
   dash.draw('dMeta', (el) => {
     const r = window.edSelected(); if (!r) { el.textContent = ''; return; }
-    const bits = [r.mkt + (r.exch ? ' ' + r.exch : ''), r.sector, r.industry, r.timing ? r.timing + ' 발표' : '', money(num(r.mcapUsd)), num(r.fpe) != null ? 'Fwd P/E ' + Number(r.fpe).toFixed(1) : '', r.reactBasis ? `반응 ${pct(num(r.reactPct)) || '대기'} (${r.reactBasis})` : '', num(r.score) != null ? '매력도 ' + Math.round(r.score) : ''];
+    const bits = [r.mkt + (r.exch ? ' ' + r.exch : ''), r.sector, r.industry, r.timing ? r.timing + ' 발표' : '', money(num(r.mcapUsd)), num(r.fpe) != null ? 'Fwd P/E ' + Number(r.fpe).toFixed(1) : '', r.reactBasis ? `반응 ${pct(num(r.reactPct)) || '대기'} (${r.reactBasis})` : ''];
     el.textContent = bits.filter(Boolean).join(' · ');
   });
   dash.draw('d', (el) => {
@@ -644,6 +640,8 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
 </script>
 
 </div>
-<script src="export.js?v=202611030649"></script>
+<script src="export.js?v=202611032332"></script>
+<script src="stock/config.js?v=202611032332"></script>
+<script src="stock/stock.js?v=202611032332"></script>
 </body>
 </html>

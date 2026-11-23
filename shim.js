@@ -11,8 +11,9 @@
   function load(id) {
     if (store[id]) return store[id];
     const s = store[id] = {status: 'loading', data: [], columns: [], meta: [], refreshing: false};
-    if (!FILES[id]) { s.status = 'missing'; return s; }
-    fetch(FILES[id] + '?v=' + (window.DASH_VERSION || '')).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    const f = FILES[id] || (/^(detail|fin|prices)_\d{8}$/.test(id) ? 'data/' + id + '.json' : null);
+    if (!f) { s.status = 'missing'; return s; }
+    fetch(f + '?v=' + (window.DASH_VERSION || '')).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((j) => { const rows = Array.isArray(j) ? j : (j.rows || j.data || j.results || []); s.data = rows; s.rows = rows; s.columns = rows.length ? Object.keys(rows[0]) : []; s.status = 'ok'; schedule(); })
       .catch((e) => { s.status = 'error'; s.message = String(e); schedule(); });
     return s;

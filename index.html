@@ -39,13 +39,12 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
 #dash-root { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; box-sizing: border-box; }
 #dash-root *, #dash-root *::before, #dash-root *::after { box-sizing: border-box; }
 </style>
-<script>window.DASH_VERSION = '202611040706';</script>
+<script>window.DASH_VERSION = '202611230133';</script>
 <script src="d3.min.js"></script>
-<script src="shim.js?v=202611040706"></script>
+<script src="shim.js?v=202611230133"></script>
 </head>
 <body>
 <div id="dash-root">
-
 
 <style>
 #dash-root { --dash-gutter: var(--cds-gap-md); }
@@ -151,7 +150,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
       <option value="up">상승 (+1% 초과)</option>
       <option value="down">하락 (-1% 미만)</option>
     </select>
-    <input class="ed-q" type="search" placeholder="티커·회사명 검색" aria-label="검색">
+    <input class="ed-q" type="search" placeholder="티커·회사명 검색 (전체 발표일)" aria-label="검색">
   </div>
 
   <div class="ed-tiles" id="kpis">
@@ -181,6 +180,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
     <div class="ed-tablewrap">
       <table class="ed-table" data-source="earnings" data-row-key="id">
         <thead><tr>
+          <th data-field="date" class="ed-datecol" hidden><button type="button" data-sort="date">발표일</button></th>
           <th data-field="mkt"><button type="button" data-sort="mkt">시장</button></th>
           <th data-field="ticker"><button type="button" data-sort="ticker">티커</button></th>
           <th data-field="name"><button type="button" data-sort="name">회사</button></th>
@@ -204,11 +204,11 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
       <span class="ed-dmeta" data-draw="dMeta">—</span>
     </div>
     <p class="ed-empty ed-hint">표나 차트에서 회사를 누르면 BM, 실적, 컨콜, 반응 이유가 여기에 나와.</p>
-    <div class="ed-chart" data-draw="dChart" data-source="prices" data-fetchpriority="low" style="min-height:220px"></div>
+    <div class="ed-chart" data-draw="dChart" data-fetchpriority="low" style="min-height:220px"></div>
     <section class="ed-blk" id="d-results">
       <h3>실적<em>컨센 대비 · 사실</em></h3>
-      <div class="ed-fwrap" data-draw="dRes" data-source="earnings"></div>
-      <ul class="ed-bul" data-draw="dNote" data-source="earnings"></ul>
+      <div class="ed-fwrap" data-draw="dRes"></div>
+      <ul class="ed-bul" data-draw="dNote"></ul>
     </section>
     <div class="ed-fin ed-blk" id="d-fin">
       <section id="d-trend">
@@ -221,13 +221,13 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
           <button type="button" data-fm="fcf">FCF</button>
           <button type="button" data-fm="om">영업이익률</button>
         </div>
-        <div class="ed-chart" data-draw="fChart" data-source="fin" data-fetchpriority="low" style="min-height:240px"></div>
+        <div class="ed-chart" data-draw="fChart" data-fetchpriority="low" style="min-height:240px"></div>
       </section>
       <section id="d-is">
         <h3>손익계산서 · 현금흐름<em>최근 5개 분기</em></h3>
-        <div class="ed-fwrap" data-draw="fTable" data-source="fin" data-fetchpriority="low"></div>
+        <div class="ed-fwrap" data-draw="fTable" data-fetchpriority="low"></div>
       </section>
-      <p class="ed-fnote" data-draw="fNote" data-source="fin" style="grid-column:1/-1"></p>
+      <p class="ed-fnote" data-draw="fNote" style="grid-column:1/-1"></p>
     </div>
     <div class="ed-sec">
       <section id="d-bm"><h3>BM</h3><p class="ed-txt" data-draw="d" data-f="bm">—</p></section>
@@ -261,7 +261,8 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
     const p = P();
     const date = p.date || d3.max(e.data, (r) => r.date);
     const q = (p.q || '').trim().toLowerCase();
-    let rows = e.data.filter((r) => r.date === date);
+    // 검색어가 있으면 날짜와 상관없이 전체 발표일에서 찾는다
+    let rows = q ? e.data.slice() : e.data.filter((r) => r.date === date);
     if (p.mkt) rows = rows.filter((r) => r.mkt === p.mkt);
     if (p.sector) rows = rows.filter((r) => r.sector === p.sector);
     if (p.timing) rows = rows.filter((r) => r.timing === p.timing);
@@ -269,7 +270,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
     if (p.dir === 'up') rows = rows.filter((r) => num(r.reactPct) > 1);
     if (p.dir === 'down') rows = rows.filter((r) => num(r.reactPct) < -1);
     if (q) rows = rows.filter((r) => (r.ticker + ' ' + r.name + ' ' + (r.industry || '')).toLowerCase().includes(q));
-    return {rows, date};
+    return {rows, date, all: !!q};
   };
   window.edSelected = function () {
     const e = dash.data('earnings');
@@ -302,6 +303,9 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
     document.querySelectorAll('.ed-cap').forEach((s) => { s.value = String(p.cap || 0) === '0' ? '0' : String(p.cap) === '1000000000' ? '1e9' : String(p.cap) === '10000000000' ? '1e10' : String(p.cap) === '100000000000' ? '1e11' : '0'; });
     document.querySelectorAll('.ed-dir').forEach((s) => { s.value = p.dir || ''; });
     document.querySelectorAll('.ed-q').forEach((s) => { if (s !== document.activeElement) s.value = p.q || ''; });
+    const searching = !!(p.q || '').trim();
+    document.querySelectorAll('.ed-datecol').forEach((th) => { th.hidden = !searching; });
+    document.querySelectorAll('[data-draw="dateSel"]').forEach((s) => { s.disabled = searching; s.title = searching ? '검색 중에는 모든 발표일에서 찾아' : ''; });
     const hasSel = !!window.edSelected();
     document.querySelectorAll('.ed-sec section, .ed-src, .ed-blk').forEach((s) => { s.hidden = !hasSel; });
     document.querySelectorAll('.ed-fm button').forEach((b) => b.setAttribute('aria-pressed', String((p.fm || 'revenue') === b.dataset.fm)));
@@ -357,7 +361,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   dash.draw('rows', (tb) => {
     const f = window.edRows();
     if (!f) { tb.replaceChildren(); return; }
-    const p = dash.params(); const k = p.sort || 'mcapUsd'; const desc = p.sort ? !!p.desc : true;
+    const p = dash.params(); const k = p.sort && (p.sort !== 'date' || f.all) ? p.sort : f.all ? 'date' : 'mcapUsd'; const desc = p.sort === k ? !!p.desc : true;
     const val = (r) => { const v = r[k]; return typeof v === 'number' ? v : (num(v) != null && !['ticker'].includes(k) ? Number(v) : (v ?? '')); };
     const rows = f.rows.slice().sort((a, b) => {
       const x = val(a), y = val(b);
@@ -367,6 +371,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
     tb.replaceChildren(...rows.map((r) => {
       const tr = document.createElement('tr'); tr.dataset.key = r.id; if (r.id === p.sel) tr.className = 'on';
       const td = (t, c) => { const d = document.createElement('td'); if (c) d.className = c; d.textContent = t; tr.append(d); return d; };
+      if (f.all) td(r.date.slice(5).replace('-', '/'));
       td(r.mkt); td(r.ticker); td(r.name, 'nm'); td(r.sector || '', 'opt');
       td(money(num(r.mcapUsd)), 'num'); td(num(r.fpe) == null ? '' : Number(r.fpe).toFixed(1), 'num opt'); td(r.timing || '');
       const es = num(r.epsSurpPct); td(pct(es), 'num ' + (es == null ? '' : es > 0 ? 'up' : es < 0 ? 'down' : ''));
@@ -438,7 +443,11 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
       .attr('fill', 'var(--color-fg-muted)').style('font-size', 'var(--cds-font-size-caption)').text((d) => `${pct(d.avg)} (${d.n})`);
   });
 
-  // detail
+  // detail: 무거운 필드는 발표일별 dataset으로 분리 — detail_YYYYMMDD, fin_YYYYMMDD, prices_YYYYMMDD
+  const wk = (d) => String(d).slice(0, 10).replace(/-/g, '');
+  const part = (kind, r) => kind + '_' + wk(r.date);
+  const rowOf = (kind, r) => { const D = dash.data(part(kind, r)); if (D.status !== 'ok') return null; return D.data.find((x) => x.id === r.id) || {}; };
+  const mark = (el, kind, r) => { el.setAttribute('data-source', part(kind, r)); };
   dash.draw('dName', (el) => { const r = window.edSelected(); el.textContent = r ? `${r.name} (${r.ticker})` : '—'; });
   dash.draw('dMeta', (el) => {
     const r = window.edSelected(); if (!r) { el.textContent = ''; return; }
@@ -447,12 +456,14 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   });
   dash.draw('d', (el) => {
     const r = window.edSelected(); const k = el.dataset.f;
-    el.textContent = r ? (r[k] || '자료 없음') : '—';
-    if (r) { el.setAttribute('data-field', k); el.setAttribute('data-where', 'id=' + encodeURIComponent(r.id)); el.setAttribute('data-source', 'earnings'); }
+    if (!r) { el.textContent = '—'; return; }
+    const x = rowOf('detail', r); el.textContent = x ? (x[k] || '자료 없음') : '—';
+    el.setAttribute('data-field', k); el.setAttribute('data-where', 'id=' + encodeURIComponent(r.id)); mark(el, 'detail', r);
   });
   dash.draw('dSrc', (el) => {
     const r = window.edSelected(); el.replaceChildren(); if (!r) { el.textContent = '—'; return; }
-    const parts = String(r.sources || '').split(' || ').filter(Boolean);
+    mark(el, 'detail', r); const x = rowOf('detail', r); if (!x) { el.textContent = '—'; return; }
+    const parts = String(x.sources || '').split(' || ').filter(Boolean);
     parts.forEach((p, i) => {
       const [label, url] = p.split(' | ');
       if (i) el.append(' · ');
@@ -462,9 +473,8 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   dash.draw('dChart', (el) => {
     el.replaceChildren();
     const r = window.edSelected(); if (!r) { el.hidden = false; return; }
-    const pr = dash.data('prices');
-    if (pr.status !== 'ok') return;
-    const row = pr.data.find((x) => x.id === r.id); if (!row) return;
+    mark(el, 'prices', r); const row = rowOf('prices', r);
+    if (!row || !row.pts) return;
     const pts = String(row.pts).split(';').map((s) => { const [d, c] = s.split(':'); return {d: new Date(d + 'T00:00:00Z'), c: Number(c)}; }).filter((p) => !isNaN(p.c));
     if (pts.length < 2) return;
     const W = el.clientWidth || 400, H = 220, m = {t: 14, r: 16, b: 26, l: 8};
@@ -511,9 +521,8 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   const yen = (v) => { if (v == null || isNaN(v)) return '—'; const a = Math.abs(v); return a >= 1e12 ? d3.format(',.2f')(v / 1e12) + '조엔' : d3.format(',.0f')(v / 1e8) + '억엔'; };
   const fmtU = (v, u) => u === 'JPY' ? yen(v) : u === 'KRW' ? won(v) : u === 'EPS' ? (v == null ? '—' : (Math.abs(v) >= 100 ? d3.format(',.0f')(v) : d3.format(',.2f')(v))) : usd(v);
   const cache = new Map();
-  const finOf = (id) => {
-    const f = dash.data('fin'); if (f.status !== 'ok') return null;
-    const row = f.data.find((x) => x.id === id); if (!row) return {none: true};
+  const finOf = (r) => {
+    const id = r.id; const row = rowOf('fin', r); if (!row) return null; if (!row.j) return {none: true};
     if (!cache.has(id)) { try { cache.set(id, {cur: row.cur, prov: num(row.prov), q: JSON.parse(row.j)}); } catch (e) { cache.set(id, {none: true}); } }
     return cache.get(id);
   };
@@ -529,8 +538,9 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
 
   dash.draw('dRes', (el) => {
     el.replaceChildren(); const r = window.edSelected(); if (!r) return;
-    let t; try { t = JSON.parse(r.resTbl || 'null'); } catch (e) { t = null; }
-    if (!t || !t.rows || !t.rows.length) { el.textContent = r.results || '자료 없음'; return; }
+    mark(el, 'detail', r); const dx = rowOf('detail', r); if (!dx) return;
+    let t; try { t = JSON.parse(dx.resTbl || 'null'); } catch (e) { t = null; }
+    if (!t || !t.rows || !t.rows.length) { el.textContent = dx.results || '자료 없음'; return; }
     const tb = document.createElement('table'); tb.className = 'ed-table ed-ftable ed-rtable';
     const hd = tb.createTHead().insertRow();
     [(t.fq ? qlab(t.fq) + ' ' : '') + '항목', '실제', '컨센', '차이', 'YoY', 'QoQ'].forEach((h) => { const th = document.createElement('th'); th.textContent = h; hd.append(th); });
@@ -548,13 +558,14 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
     const cap = document.createElement('p'); cap.className = 'ed-fnote'; cap.textContent = '기준: ' + t.basis; el.append(cap);
   });
   dash.draw('dNote', (el) => {
-    el.replaceChildren(); const r = window.edSelected(); if (!r || !r.resNote) return;
-    String(r.resNote).split(/(?<=[.。])\s+|\n/).map((s) => s.trim()).filter(Boolean).forEach((s) => { const li = document.createElement('li'); li.textContent = s; el.append(li); });
+    el.replaceChildren(); const r = window.edSelected(); if (!r) return;
+    mark(el, 'detail', r); const dx = rowOf('detail', r); if (!dx || !dx.resNote) return;
+    String(dx.resNote).split(/(?<=[.。])\s+|\n/).map((s) => s.trim()).filter(Boolean).forEach((s) => { const li = document.createElement('li'); li.textContent = s; el.append(li); });
   });
 
   dash.draw('fChart', (el) => {
     el.replaceChildren(); const r = window.edSelected(); if (!r) return;
-    const F = finOf(r.id); if (!F) return;
+    mark(el, 'fin', r); const F = finOf(r); if (!F) return;
     if (F.none) { el.textContent = 'stockanalysis 분기 재무 없음'; return; }
     const fm = dash.params().fm || 'revenue';
     const val = (x) => fm === 'om' ? (num(x.revenue) && num(x.opinc) != null ? num(x.opinc) / num(x.revenue) * 100 : null) : num(x[fm]);
@@ -603,7 +614,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   function ratio(a, b) { a = num(a); b = num(b); return a == null || !b ? null : a / b * 100; }
   dash.draw('fTable', (el) => {
     el.replaceChildren(); const r = window.edSelected(); if (!r) return;
-    const F = finOf(r.id); if (!F) return;
+    mark(el, 'fin', r); const F = finOf(r); if (!F) return;
     if (F.none) { el.textContent = 'stockanalysis 분기 재무 없음'; return; }
     const q = F.q.slice(-5); const sc = scaleOf(F.cur, F.q);
     const tb = document.createElement('table'); tb.className = 'ed-table ed-ftable';
@@ -630,7 +641,7 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
   });
   dash.draw('fNote', (el) => {
     const r = window.edSelected(); if (!r) { el.textContent = ''; return; }
-    const F = finOf(r.id); if (!F || F.none) { el.textContent = ''; return; }
+    mark(el, 'fin', r); const F = finOf(r); if (!F || F.none) { el.textContent = ''; return; }
     const prov = F.q.some((x) => x.prov);
     el.textContent = `출처: stockanalysis 분기 재무 (S&P Global, ${F.cur}). 회계 기준 수치(GAAP/IFRS)라 보도자료의 조정 EPS와 다를 수 있어. 표의 YoY는 가장 오른쪽 분기와 1년 전 분기(맨 왼쪽) 비교, 비율은 %p 차이.` + (prov ? (r.mkt === '국장' ? ' 잠정 = 아직 stockanalysis에 안 들어온 분기를 DART 잠정실적(매출·영업이익·순이익)으로 채운 값.' : r.mkt === '일장' ? ' 잠정 = 아직 stockanalysis에 안 들어온 분기를 決算短信 누적치에서 앞 분기를 빼 채운 값.' : ' 잠정 = 아직 stockanalysis에 안 들어온 분기를 보도자료 매출로 채운 값.') : '');
   });
@@ -641,8 +652,8 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); fon
 </script>
 
 </div>
-<script src="export.js?v=202611040706"></script>
-<script src="stock/config.js?v=202611040706"></script>
-<script src="stock/stock.js?v=202611040706"></script>
+<script src="export.js?v=202611230133"></script>
+<script src="stock/config.js?v=202611230133"></script>
+<script src="stock/stock.js?v=202611230133"></script>
 </body>
 </html>
